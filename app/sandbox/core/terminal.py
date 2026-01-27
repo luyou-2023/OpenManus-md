@@ -1,32 +1,36 @@
 """
-Asynchronous Docker Terminal
+异步Docker终端模块
 
-This module provides asynchronous terminal functionality for Docker containers,
-allowing interactive command execution with timeout control.
+此模块为Docker容器提供异步终端功能，
+允许交互式命令执行和超时控制。
 """
 
-import asyncio
-import re
-import socket
-from typing import Dict, Optional, Tuple, Union
+import asyncio  # 异步IO库
+import re  # 正则表达式库，用于清理命令输出
+import socket  # Socket库，用于网络通信
+from typing import Dict, Optional, Tuple, Union  # 类型提示
 
-import docker
-from docker import APIClient
-from docker.errors import APIError
-from docker.models.containers import Container
+import docker  # Docker客户端库
+from docker import APIClient  # Docker API客户端
+from docker.errors import APIError  # Docker API错误
+from docker.models.containers import Container  # Docker容器模型
 
 
 class DockerSession:
+    """Docker会话类
+
+    管理Docker容器的交互式终端会话。
+    """
     def __init__(self, container_id: str) -> None:
-        """Initializes a Docker session.
+        """初始化Docker会话
 
         Args:
-            container_id: ID of the Docker container.
+            container_id: Docker容器的ID
         """
-        self.api = APIClient()
-        self.container_id = container_id
-        self.exec_id = None
-        self.socket = None
+        self.api = APIClient()  # 创建Docker API客户端
+        self.container_id = container_id  # 保存容器ID
+        self.exec_id = None  # exec实例ID，初始为None
+        self.socket = None  # Socket连接，初始为None
 
     async def create(self, working_dir: str, env_vars: Dict[str, str]) -> None:
         """Creates an interactive session with the container.
@@ -249,6 +253,10 @@ class DockerSession:
 
 
 class AsyncDockerizedTerminal:
+    """异步Docker化终端类
+
+    为Docker容器提供异步终端功能。
+    """
     def __init__(
         self,
         container: Union[str, Container],
@@ -256,24 +264,24 @@ class AsyncDockerizedTerminal:
         env_vars: Optional[Dict[str, str]] = None,
         default_timeout: int = 60,
     ) -> None:
-        """Initializes an asynchronous terminal for Docker containers.
+        """初始化Docker容器的异步终端
 
         Args:
-            container: Docker container ID or Container object.
-            working_dir: Working directory inside the container.
-            env_vars: Environment variables to set.
-            default_timeout: Default command execution timeout in seconds.
+            container: Docker容器ID或Container对象
+            working_dir: 容器内的工作目录
+            env_vars: 要设置的环境变量
+            default_timeout: 默认命令执行超时时间（秒）
         """
-        self.client = docker.from_env()
+        self.client = docker.from_env()  # 从环境变量创建Docker客户端
         self.container = (
             container
-            if isinstance(container, Container)
-            else self.client.containers.get(container)
+            if isinstance(container, Container)  # 如果已经是Container对象
+            else self.client.containers.get(container)  # 否则通过ID获取容器对象
         )
-        self.working_dir = working_dir
-        self.env_vars = env_vars or {}
-        self.default_timeout = default_timeout
-        self.session = None
+        self.working_dir = working_dir  # 工作目录
+        self.env_vars = env_vars or {}  # 环境变量字典
+        self.default_timeout = default_timeout  # 默认超时时间
+        self.session = None  # Docker会话实例，初始为None
 
     async def init(self) -> None:
         """Initializes the terminal environment.

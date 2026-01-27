@@ -1,29 +1,28 @@
-import asyncio
-import uuid
-from contextlib import asynccontextmanager
-from typing import Dict, Optional, Set
+import asyncio  # 异步IO库
+import uuid  # UUID生成库
+from contextlib import asynccontextmanager  # 异步上下文管理器
+from typing import Dict, Optional, Set  # 类型提示
 
-import docker
-from docker.errors import APIError, ImageNotFound
+import docker  # Docker客户端库
+from docker.errors import APIError, ImageNotFound  # Docker错误类
 
-from app.config import SandboxSettings
-from app.logger import logger
-from app.sandbox.core.sandbox import DockerSandbox
+from app.config import SandboxSettings  # 沙箱配置
+from app.logger import logger  # 日志记录器
+from app.sandbox.core.sandbox import DockerSandbox  # Docker沙箱类
 
 
 class SandboxManager:
-    """Docker sandbox manager.
+    """Docker沙箱管理器类
 
-    Manages multiple DockerSandbox instances lifecycle including creation,
-    monitoring, and cleanup. Provides concurrent access control and automatic
-    cleanup mechanisms for sandbox resources.
+    管理多个DockerSandbox实例的生命周期，包括创建、
+    监控和清理。提供并发访问控制和自动清理机制。
 
     Attributes:
-        max_sandboxes: Maximum allowed number of sandboxes.
-        idle_timeout: Sandbox idle timeout in seconds.
-        cleanup_interval: Cleanup check interval in seconds.
-        _sandboxes: Active sandbox instance mapping.
-        _last_used: Last used time record for sandboxes.
+        max_sandboxes: 允许的最大沙箱数量
+        idle_timeout: 沙箱空闲超时时间（秒）
+        cleanup_interval: 清理检查间隔（秒）
+        _sandboxes: 活动沙箱实例映射
+        _last_used: 沙箱最后使用时间记录
     """
 
     def __init__(
@@ -32,35 +31,35 @@ class SandboxManager:
         idle_timeout: int = 3600,
         cleanup_interval: int = 300,
     ):
-        """Initializes sandbox manager.
+        """初始化沙箱管理器
 
         Args:
-            max_sandboxes: Maximum sandbox count limit.
-            idle_timeout: Idle timeout in seconds.
-            cleanup_interval: Cleanup check interval in seconds.
+            max_sandboxes: 最大沙箱数量限制
+            idle_timeout: 空闲超时时间（秒）
+            cleanup_interval: 清理检查间隔（秒）
         """
-        self.max_sandboxes = max_sandboxes
-        self.idle_timeout = idle_timeout
-        self.cleanup_interval = cleanup_interval
+        self.max_sandboxes = max_sandboxes  # 最大沙箱数量
+        self.idle_timeout = idle_timeout  # 空闲超时时间
+        self.cleanup_interval = cleanup_interval  # 清理检查间隔
 
-        # Docker client
-        self._client = docker.from_env()
+        # Docker客户端
+        self._client = docker.from_env()  # 从环境变量创建Docker客户端
 
-        # Resource mappings
-        self._sandboxes: Dict[str, DockerSandbox] = {}
-        self._last_used: Dict[str, float] = {}
+        # 资源映射
+        self._sandboxes: Dict[str, DockerSandbox] = {}  # 沙箱ID到沙箱实例的映射
+        self._last_used: Dict[str, float] = {}  # 沙箱ID到最后使用时间的映射
 
-        # Concurrency control
-        self._locks: Dict[str, asyncio.Lock] = {}
-        self._global_lock = asyncio.Lock()
-        self._active_operations: Set[str] = set()
+        # 并发控制
+        self._locks: Dict[str, asyncio.Lock] = {}  # 每个沙箱的锁
+        self._global_lock = asyncio.Lock()  # 全局锁
+        self._active_operations: Set[str] = set()  # 活动操作集合
 
-        # Cleanup task
-        self._cleanup_task: Optional[asyncio.Task] = None
-        self._is_shutting_down = False
+        # 清理任务
+        self._cleanup_task: Optional[asyncio.Task] = None  # 清理任务，可选
+        self._is_shutting_down = False  # 关闭标志
 
-        # Start automatic cleanup
-        self.start_cleanup_task()
+        # 启动自动清理
+        self.start_cleanup_task()  # 启动清理任务
 
     async def ensure_image(self, image: str) -> bool:
         """Ensures Docker image is available.

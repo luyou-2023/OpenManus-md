@@ -1,137 +1,180 @@
-import json
-import time
-from enum import Enum
-from typing import Dict, List, Optional, Union
+import json  # JSON解析库，用于解析工具参数
+import time  # 时间库，用于生成计划ID
+from enum import Enum  # 枚举类型
+from typing import Dict, List, Optional, Union  # 类型提示
 
-from pydantic import Field
+from pydantic import Field  # Pydantic字段定义
 
-from app.agent.base import BaseAgent
-from app.flow.base import BaseFlow
-from app.llm import LLM
-from app.logger import logger
-from app.schema import AgentState, Message, ToolChoice
-from app.tool import PlanningTool
+from app.agent.base import BaseAgent  # 代理基类
+from app.flow.base import BaseFlow  # 流程基类
+from app.llm import LLM  # LLM客户端
+from app.logger import logger  # 日志记录器
+from app.schema import AgentState, Message, ToolChoice  # 数据模型和枚举
+from app.tool import PlanningTool  # 规划工具
 
 
 class PlanStepStatus(str, Enum):
-    """Enum class defining possible statuses of a plan step"""
+    """计划步骤状态枚举类
 
-    NOT_STARTED = "not_started"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    BLOCKED = "blocked"
+    定义了计划步骤的所有可能状态
+    """
+
+    NOT_STARTED = "not_started"  # 未开始状态
+    IN_PROGRESS = "in_progress"  # 进行中状态
+    COMPLETED = "completed"  # 已完成状态
+    BLOCKED = "blocked"  # 阻塞状态
 
     @classmethod
     def get_all_statuses(cls) -> list[str]:
-        """Return a list of all possible step status values"""
-        return [status.value for status in cls]
+        """返回所有可能的步骤状态值列表
+
+        Returns:
+            list[str]: 所有状态值的列表
+        """
+        return [status.value for status in cls]  # 提取所有枚举值
 
     @classmethod
     def get_active_statuses(cls) -> list[str]:
-        """Return a list of values representing active statuses (not started or in progress)"""
-        return [cls.NOT_STARTED.value, cls.IN_PROGRESS.value]
+        """返回表示活动状态的值列表（未开始或进行中）
+
+        Returns:
+            list[str]: 活动状态值列表
+        """
+        return [cls.NOT_STARTED.value, cls.IN_PROGRESS.value]  # 返回未开始和进行中状态
 
     @classmethod
     def get_status_marks(cls) -> Dict[str, str]:
-        """Return a mapping of statuses to their marker symbols"""
+        """返回状态到标记符号的映射
+
+        Returns:
+            Dict[str, str]: 状态到标记符号的字典
+        """
         return {
-            cls.COMPLETED.value: "[✓]",
-            cls.IN_PROGRESS.value: "[→]",
-            cls.BLOCKED.value: "[!]",
-            cls.NOT_STARTED.value: "[ ]",
+            cls.COMPLETED.value: "[✓]",  # 已完成标记
+            cls.IN_PROGRESS.value: "[→]",  # 进行中标记
+            cls.BLOCKED.value: "[!]",  # 阻塞标记
+            cls.NOT_STARTED.value: "[ ]",  # 未开始标记
         }
 
 
 class PlanningFlow(BaseFlow):
-    """A flow that manages planning and execution of tasks using agents."""
+    """规划流程类
 
-    llm: LLM = Field(default_factory=lambda: LLM())
-    planning_tool: PlanningTool = Field(default_factory=PlanningTool)
-    executor_keys: List[str] = Field(default_factory=list)
-    active_plan_id: str = Field(default_factory=lambda: f"plan_{int(time.time())}")
-    current_step_index: Optional[int] = None
+    管理使用代理进行任务的规划和执行。
+    实现规划-执行模式：先创建计划，然后逐步执行计划中的步骤。
+    """
+
+    llm: LLM = Field(default_factory=lambda: LLM())  # LLM客户端，默认创建新实例
+    planning_tool: PlanningTool = Field(default_factory=PlanningTool)  # 规划工具，默认创建新实例
+    executor_keys: List[str] = Field(default_factory=list)  # 执行代理键名列表，默认为空列表
+    active_plan_id: str = Field(default_factory=lambda: f"plan_{int(time.time())}")  # 活动计划ID，默认使用时间戳生成
+    current_step_index: Optional[int] = None  # 当前步骤索引，可选
 
     def __init__(
         self, agents: Union[BaseAgent, List[BaseAgent], Dict[str, BaseAgent]], **data
     ):
-        # Set executor keys before super().__init__
-        if "executors" in data:
-            data["executor_keys"] = data.pop("executors")
+        """初始化规划流程
 
-        # Set plan ID if provided
-        if "plan_id" in data:
-            data["active_plan_id"] = data.pop("plan_id")
+        Args:
+            agents: 代理对象、代理列表或代理字典
+            **data: 其他数据（executors、plan_id、planning_tool等）
+        """
+        # 在super().__init__之前设置executor keys
+        if "executors" in data:  # 如果data中包含executors
+            data["executor_keys"] = data.pop("executors")  # 将executors重命名为executor_keys
 
-        # Initialize the planning tool if not provided
-        if "planning_tool" not in data:
-            planning_tool = PlanningTool()
-            data["planning_tool"] = planning_tool
+        # 如果提供了计划ID，则设置
+        if "plan_id" in data:  # 如果data中包含plan_id
+            data["active_plan_id"] = data.pop("plan_id")  # 将plan_id重命名为active_plan_id
 
-        # Call parent's init with the processed data
-        super().__init__(agents, **data)
+        # 如果未提供规划工具，则初始化
+        if "planning_tool" not in data:  # 如果data中不包含planning_tool
+            planning_tool = PlanningTool()  # 创建规划工具实例
+            data["planning_tool"] = planning_tool  # 添加到data中
 
-        # Set executor_keys to all agent keys if not specified
-        if not self.executor_keys:
-            self.executor_keys = list(self.agents.keys())
+        # 使用处理后的数据调用父类的init
+        super().__init__(agents, **data)  # 调用父类构造函数
+
+        # 如果未指定executor_keys，则设置为所有代理键名
+        if not self.executor_keys:  # 如果executor_keys为空
+            self.executor_keys = list(self.agents.keys())  # 使用所有代理的键名
 
     def get_executor(self, step_type: Optional[str] = None) -> BaseAgent:
-        """
-        Get an appropriate executor agent for the current step.
-        Can be extended to select agents based on step type/requirements.
-        """
-        # If step type is provided and matches an agent key, use that agent
-        if step_type and step_type in self.agents:
-            return self.agents[step_type]
+        """获取当前步骤的适当执行代理
 
-        # Otherwise use the first available executor or fall back to primary agent
-        for key in self.executor_keys:
-            if key in self.agents:
-                return self.agents[key]
+        可以根据步骤类型选择代理。可以扩展以基于步骤类型/需求选择代理。
 
-        # Fallback to primary agent
-        return self.primary_agent
+        Args:
+            step_type: 步骤类型，可选
+
+        Returns:
+            BaseAgent: 执行代理对象
+        """
+        # 如果提供了步骤类型且匹配代理键名，使用该代理
+        if step_type and step_type in self.agents:  # 如果步骤类型存在且匹配代理键名
+            return self.agents[step_type]  # 返回对应的代理
+
+        # 否则使用第一个可用的执行代理或回退到主代理
+        for key in self.executor_keys:  # 遍历执行代理键名列表
+            if key in self.agents:  # 如果键名在代理字典中
+                return self.agents[key]  # 返回对应的代理
+
+        # 回退到主代理
+        return self.primary_agent  # 返回主代理
 
     async def execute(self, input_text: str) -> str:
-        """Execute the planning flow with agents."""
+        """使用代理执行规划流程
+
+        主要执行流程：
+        1. 创建初始计划（如果提供了输入）
+        2. 循环执行计划步骤直到完成
+        3. 完成计划并返回结果
+
+        Args:
+            input_text: 输入文本（任务描述）
+
+        Returns:
+            str: 执行结果摘要
+        """
         try:
-            if not self.primary_agent:
-                raise ValueError("No primary agent available")
+            if not self.primary_agent:  # 如果没有主代理
+                raise ValueError("No primary agent available")  # 抛出值错误
 
-            # Create initial plan if input provided
-            if input_text:
-                await self._create_initial_plan(input_text)
+            # 如果提供了输入，创建初始计划
+            if input_text:  # 如果输入文本不为空
+                await self._create_initial_plan(input_text)  # 创建初始计划
 
-                # Verify plan was created successfully
-                if self.active_plan_id not in self.planning_tool.plans:
+                # 验证计划是否成功创建
+                if self.active_plan_id not in self.planning_tool.plans:  # 如果计划ID不在规划工具的计划字典中
                     logger.error(
-                        f"Plan creation failed. Plan ID {self.active_plan_id} not found in planning tool."
+                        f"Plan creation failed. Plan ID {self.active_plan_id} not found in planning tool."  # 记录错误日志
                     )
-                    return f"Failed to create plan for: {input_text}"
+                    return f"Failed to create plan for: {input_text}"  # 返回失败消息
 
-            result = ""
-            while True:
-                # Get current step to execute
-                self.current_step_index, step_info = await self._get_current_step_info()
+            result = ""  # 初始化结果字符串
+            while True:  # 无限循环，直到计划完成
+                # 获取要执行的当前步骤
+                self.current_step_index, step_info = await self._get_current_step_info()  # 获取当前步骤索引和信息
 
-                # Exit if no more steps or plan completed
-                if self.current_step_index is None:
-                    result += await self._finalize_plan()
-                    break
+                # 如果没有更多步骤或计划完成，退出
+                if self.current_step_index is None:  # 如果当前步骤索引为None（没有更多步骤）
+                    result += await self._finalize_plan()  # 完成计划并添加到结果
+                    break  # 退出循环
 
-                # Execute current step with appropriate agent
-                step_type = step_info.get("type") if step_info else None
-                executor = self.get_executor(step_type)
-                step_result = await self._execute_step(executor, step_info)
-                result += step_result + "\n"
+                # 使用适当的代理执行当前步骤
+                step_type = step_info.get("type") if step_info else None  # 获取步骤类型
+                executor = self.get_executor(step_type)  # 获取执行代理
+                step_result = await self._execute_step(executor, step_info)  # 执行步骤
+                result += step_result + "\n"  # 将步骤结果添加到结果字符串
 
-                # Check if agent wants to terminate
-                if hasattr(executor, "state") and executor.state == AgentState.FINISHED:
-                    break
+                # 检查代理是否想要终止
+                if hasattr(executor, "state") and executor.state == AgentState.FINISHED:  # 如果代理状态为完成
+                    break  # 退出循环
 
-            return result
-        except Exception as e:
-            logger.error(f"Error in PlanningFlow: {str(e)}")
-            return f"Execution failed: {str(e)}"
+            return result  # 返回结果摘要
+        except Exception as e:  # 捕获任何异常
+            logger.error(f"Error in PlanningFlow: {str(e)}")  # 记录错误日志
+            return f"Execution failed: {str(e)}"  # 返回失败消息
 
     async def _create_initial_plan(self, request: str) -> None:
         """Create an initial plan based on the request using the flow's LLM and PlanningTool."""

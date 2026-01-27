@@ -1,22 +1,22 @@
-import base64
-import io
-import json
-import traceback
-from typing import Optional  # Add this import for Optional
+import base64  # Base64编码库，用于图像编码
+import io  # IO操作库
+import json  # JSON解析库
+import traceback  # 追踪异常库
+from typing import Optional  # 类型提示
 
-from PIL import Image
-from pydantic import Field
+from PIL import Image  # PIL图像处理库
+from pydantic import Field  # Pydantic字段定义
 
-from app.daytona.tool_base import (  # Ensure Sandbox is imported correctly
-    Sandbox,
-    SandboxToolsBase,
-    ThreadMessage,
+from app.daytona.tool_base import (  # 确保Sandbox正确导入
+    Sandbox,  # Daytona沙箱类
+    SandboxToolsBase,  # 沙箱工具基类
+    ThreadMessage,  # 线程消息类
 )
-from app.tool.base import ToolResult
-from app.utils.logger import logger
+from app.tool.base import ToolResult  # 工具结果基类
+from app.utils.logger import logger  # 日志记录器
 
 
-# Context = TypeVar("Context")
+# Context = TypeVar("Context")  # 上下文类型变量（已注释）
 _BROWSER_DESCRIPTION = """\
 A sandbox-based browser automation tool that allows interaction with web pages through various actions.
 * This tool provides commands for controlling a browser session in a sandboxed environment
@@ -29,15 +29,18 @@ Key capabilities include:
 * Scrolling: Scroll up/down by pixel amount or scroll to specific text
 * Tab management: Switch between tabs or close tabs
 * Content extraction: Get dropdown options or select dropdown options
-"""
+"""  # 沙箱浏览器工具的描述文本
 
 
 # noinspection PyArgumentList
 class SandboxBrowserTool(SandboxToolsBase):
-    """Tool for executing tasks in a Daytona sandbox with browser-use capabilities."""
+    """沙箱浏览器工具类
 
-    name: str = "sandbox_browser"
-    description: str = _BROWSER_DESCRIPTION
+    用于在Daytona沙箱中执行具有浏览器使用能力的任务。
+    """
+
+    name: str = "sandbox_browser"  # 工具名称
+    description: str = _BROWSER_DESCRIPTION  # 工具描述
     parameters: dict = {
         "type": "object",
         "properties": {

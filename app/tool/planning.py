@@ -1,73 +1,74 @@
 # tool/planning.py
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional  # 类型提示
 
-from app.exceptions import ToolError
-from app.tool.base import BaseTool, ToolResult
+from app.exceptions import ToolError  # 工具错误异常
+from app.tool.base import BaseTool, ToolResult  # 工具基类和结果类
 
 
 _PLANNING_TOOL_DESCRIPTION = """
 A planning tool that allows the agent to create and manage plans for solving complex tasks.
 The tool provides functionality for creating plans, updating plan steps, and tracking progress.
-"""
+"""  # 规划工具的描述文本
 
 
 class PlanningTool(BaseTool):
-    """
-    A planning tool that allows the agent to create and manage plans for solving complex tasks.
-    The tool provides functionality for creating plans, updating plan steps, and tracking progress.
+    """规划工具类
+
+    允许代理创建和管理用于解决复杂任务的计划。
+    提供创建计划、更新计划步骤和跟踪进度的功能。
     """
 
-    name: str = "planning"
-    description: str = _PLANNING_TOOL_DESCRIPTION
+    name: str = "planning"  # 工具名称
+    description: str = _PLANNING_TOOL_DESCRIPTION  # 工具描述
     parameters: dict = {
-        "type": "object",
+        "type": "object",  # 参数类型为对象
         "properties": {
             "command": {
-                "description": "The command to execute. Available commands: create, update, list, get, set_active, mark_step, delete.",
+                "description": "The command to execute. Available commands: create, update, list, get, set_active, mark_step, delete.",  # 命令描述
                 "enum": [
-                    "create",
-                    "update",
-                    "list",
-                    "get",
-                    "set_active",
-                    "mark_step",
-                    "delete",
+                    "create",  # 创建计划
+                    "update",  # 更新计划
+                    "list",  # 列出计划
+                    "get",  # 获取计划
+                    "set_active",  # 设置活动计划
+                    "mark_step",  # 标记步骤
+                    "delete",  # 删除计划
                 ],
-                "type": "string",
+                "type": "string",  # 命令类型为字符串
             },
             "plan_id": {
-                "description": "Unique identifier for the plan. Required for create, update, set_active, and delete commands. Optional for get and mark_step (uses active plan if not specified).",
-                "type": "string",
+                "description": "Unique identifier for the plan. Required for create, update, set_active, and delete commands. Optional for get and mark_step (uses active plan if not specified).",  # 计划ID描述
+                "type": "string",  # 计划ID类型为字符串
             },
             "title": {
-                "description": "Title for the plan. Required for create command, optional for update command.",
-                "type": "string",
+                "description": "Title for the plan. Required for create command, optional for update command.",  # 计划标题描述
+                "type": "string",  # 标题类型为字符串
             },
             "steps": {
-                "description": "List of plan steps. Required for create command, optional for update command.",
-                "type": "array",
-                "items": {"type": "string"},
+                "description": "List of plan steps. Required for create command, optional for update command.",  # 计划步骤描述
+                "type": "array",  # 步骤类型为数组
+                "items": {"type": "string"},  # 数组元素类型为字符串
             },
             "step_index": {
-                "description": "Index of the step to update (0-based). Required for mark_step command.",
-                "type": "integer",
+                "description": "Index of the step to update (0-based). Required for mark_step command.",  # 步骤索引描述
+                "type": "integer",  # 索引类型为整数
             },
             "step_status": {
-                "description": "Status to set for a step. Used with mark_step command.",
-                "enum": ["not_started", "in_progress", "completed", "blocked"],
-                "type": "string",
+                "description": "Status to set for a step. Used with mark_step command.",  # 步骤状态描述
+                "enum": ["not_started", "in_progress", "completed", "blocked"],  # 状态枚举值
+                "type": "string",  # 状态类型为字符串
             },
             "step_notes": {
-                "description": "Additional notes for a step. Optional for mark_step command.",
-                "type": "string",
+                "description": "Additional notes for a step. Optional for mark_step command.",  # 步骤备注描述
+                "type": "string",  # 备注类型为字符串
             },
         },
-        "required": ["command"],
-        "additionalProperties": False,
+        "required": ["command"],  # 必需参数：command
+        "additionalProperties": False,  # 不允许额外属性
     }
 
-    plans: dict = {}  # Dictionary to store plans by plan_id
-    _current_plan_id: Optional[str] = None  # Track the current active plan
+    plans: dict = {}  # 按plan_id存储计划的字典
+    _current_plan_id: Optional[str] = None  # 跟踪当前活动计划ID
 
     async def execute(
         self,
@@ -85,36 +86,42 @@ class PlanningTool(BaseTool):
         step_notes: Optional[str] = None,
         **kwargs,
     ):
-        """
-        Execute the planning tool with the given command and parameters.
+        """执行规划工具，使用给定的命令和参数
 
-        Parameters:
-        - command: The operation to perform
-        - plan_id: Unique identifier for the plan
-        - title: Title for the plan (used with create command)
-        - steps: List of steps for the plan (used with create command)
-        - step_index: Index of the step to update (used with mark_step command)
-        - step_status: Status to set for a step (used with mark_step command)
-        - step_notes: Additional notes for a step (used with mark_step command)
+        Args:
+            command: 要执行的操作
+            plan_id: 计划的唯一标识符
+            title: 计划标题（用于create命令）
+            steps: 计划步骤列表（用于create命令）
+            step_index: 要更新的步骤索引（用于mark_step命令）
+            step_status: 要为步骤设置的状态（用于mark_step命令）
+            step_notes: 步骤的附加备注（用于mark_step命令）
+            **kwargs: 其他参数
+
+        Returns:
+            ToolResult: 工具执行结果
+
+        Raises:
+            ToolError: 如果命令无效或参数错误
         """
 
-        if command == "create":
-            return self._create_plan(plan_id, title, steps)
-        elif command == "update":
-            return self._update_plan(plan_id, title, steps)
-        elif command == "list":
-            return self._list_plans()
-        elif command == "get":
-            return self._get_plan(plan_id)
-        elif command == "set_active":
-            return self._set_active_plan(plan_id)
-        elif command == "mark_step":
-            return self._mark_step(plan_id, step_index, step_status, step_notes)
-        elif command == "delete":
-            return self._delete_plan(plan_id)
-        else:
+        if command == "create":  # 如果命令是创建
+            return self._create_plan(plan_id, title, steps)  # 调用创建计划方法
+        elif command == "update":  # 如果命令是更新
+            return self._update_plan(plan_id, title, steps)  # 调用更新计划方法
+        elif command == "list":  # 如果命令是列出
+            return self._list_plans()  # 调用列出计划方法
+        elif command == "get":  # 如果命令是获取
+            return self._get_plan(plan_id)  # 调用获取计划方法
+        elif command == "set_active":  # 如果命令是设置活动
+            return self._set_active_plan(plan_id)  # 调用设置活动计划方法
+        elif command == "mark_step":  # 如果命令是标记步骤
+            return self._mark_step(plan_id, step_index, step_status, step_notes)  # 调用标记步骤方法
+        elif command == "delete":  # 如果命令是删除
+            return self._delete_plan(plan_id)  # 调用删除计划方法
+        else:  # 如果命令无效
             raise ToolError(
-                f"Unrecognized command: {command}. Allowed commands are: create, update, list, get, set_active, mark_step, delete"
+                f"Unrecognized command: {command}. Allowed commands are: create, update, list, get, set_active, mark_step, delete"  # 抛出工具错误
             )
 
     def _create_plan(

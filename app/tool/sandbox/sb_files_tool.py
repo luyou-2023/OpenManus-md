@@ -1,15 +1,15 @@
-import asyncio
-from typing import Optional, TypeVar
+import asyncio  # 异步IO库
+from typing import Optional, TypeVar  # 类型提示
 
-from pydantic import Field
+from pydantic import Field  # Pydantic字段定义
 
-from app.daytona.tool_base import Sandbox, SandboxToolsBase
-from app.tool.base import ToolResult
-from app.utils.files_utils import clean_path, should_exclude_file
-from app.utils.logger import logger
+from app.daytona.tool_base import Sandbox, SandboxToolsBase  # Daytona沙箱和沙箱工具基类
+from app.tool.base import ToolResult  # 工具结果基类
+from app.utils.files_utils import clean_path, should_exclude_file  # 路径清理和文件排除工具函数
+from app.utils.logger import logger  # 日志记录器
 
 
-Context = TypeVar("Context")
+Context = TypeVar("Context")  # 上下文类型变量
 
 _FILES_DESCRIPTION = """\
 A sandbox-based file system tool that allows file operations in a secure sandboxed environment.
@@ -22,12 +22,16 @@ Key capabilities include:
 * File modification: Replace specific strings or completely rewrite files
 * File deletion: Remove files from the workspace
 * File reading: Read file contents with optional line range specification
-"""
+"""  # 沙箱文件工具的描述文本
 
 
 class SandboxFilesTool(SandboxToolsBase):
-    name: str = "sandbox_files"
-    description: str = _FILES_DESCRIPTION
+    """沙箱文件工具类
+
+    基于沙箱的文件系统工具，允许在安全的沙箱环境中进行文件操作。
+    """
+    name: str = "sandbox_files"  # 工具名称
+    description: str = _FILES_DESCRIPTION  # 工具描述
     parameters: dict = {
         "type": "object",
         "properties": {

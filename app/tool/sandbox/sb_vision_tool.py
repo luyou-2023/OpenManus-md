@@ -1,37 +1,41 @@
-import base64
-import mimetypes
-import os
-from io import BytesIO
-from typing import Optional
+import base64  # Base64编码库，用于图像编码
+import mimetypes  # MIME类型库，用于检测文件类型
+import os  # 操作系统接口库
+from io import BytesIO  # 字节流IO
+from typing import Optional  # 类型提示
 
-from PIL import Image
-from pydantic import Field
+from PIL import Image  # PIL图像处理库
+from pydantic import Field  # Pydantic字段定义
 
-from app.daytona.tool_base import Sandbox, SandboxToolsBase, ThreadMessage
-from app.tool.base import ToolResult
+from app.daytona.tool_base import Sandbox, SandboxToolsBase, ThreadMessage  # Daytona沙箱、沙箱工具基类、线程消息
+from app.tool.base import ToolResult  # 工具结果基类
 
 
 # 最大文件大小（原图10MB，压缩后5MB）
-MAX_IMAGE_SIZE = 10 * 1024 * 1024
-MAX_COMPRESSED_SIZE = 5 * 1024 * 1024
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 最大图像大小：10MB
+MAX_COMPRESSED_SIZE = 5 * 1024 * 1024  # 最大压缩后大小：5MB
 
 # 压缩设置
-DEFAULT_MAX_WIDTH = 1920
-DEFAULT_MAX_HEIGHT = 1080
-DEFAULT_JPEG_QUALITY = 85
-DEFAULT_PNG_COMPRESS_LEVEL = 6
+DEFAULT_MAX_WIDTH = 1920  # 默认最大宽度：1920像素
+DEFAULT_MAX_HEIGHT = 1080  # 默认最大高度：1080像素
+DEFAULT_JPEG_QUALITY = 85  # 默认JPEG质量：85
+DEFAULT_PNG_COMPRESS_LEVEL = 6  # 默认PNG压缩级别：6
 
 _VISION_DESCRIPTION = """
 A sandbox-based vision tool that allows the agent to read image files inside the sandbox using the see_image action.
 * Only the see_image action is supported, with the parameter being the relative path of the image under /workspace.
 * The image will be compressed and converted to base64 for use in subsequent context.
 * Supported formats: JPG, PNG, GIF, WEBP. Maximum size: 10MB.
-"""
+"""  # 沙箱视觉工具的描述文本
 
 
 class SandboxVisionTool(SandboxToolsBase):
-    name: str = "sandbox_vision"
-    description: str = _VISION_DESCRIPTION
+    """沙箱视觉工具类
+
+    基于沙箱的视觉工具，允许代理使用see_image操作读取沙箱内的图像文件。
+    """
+    name: str = "sandbox_vision"  # 工具名称
+    description: str = _VISION_DESCRIPTION  # 工具描述
     parameters: dict = {
         "type": "object",
         "properties": {

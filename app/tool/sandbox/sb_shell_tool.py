@@ -1,30 +1,32 @@
-import asyncio
-import time
-from typing import Any, Dict, Optional, TypeVar
-from uuid import uuid4
+import asyncio  # 异步IO库
+import time  # 时间库
+from typing import Any, Dict, Optional, TypeVar  # 类型提示
+from uuid import uuid4  # UUID生成函数
 
-from app.daytona.tool_base import Sandbox, SandboxToolsBase
-from app.tool.base import ToolResult
-from app.utils.logger import logger
+from app.daytona.tool_base import Sandbox, SandboxToolsBase  # Daytona沙箱和沙箱工具基类
+from app.tool.base import ToolResult  # 工具结果基类
+from app.utils.logger import logger  # 日志记录器
 
 
-Context = TypeVar("Context")
+Context = TypeVar("Context")  # 上下文类型变量
 _SHELL_DESCRIPTION = """\
 Execute a shell command in the workspace directory.
 IMPORTANT: Commands are non-blocking by default and run in a tmux session.
 This is ideal for long-running operations like starting servers or build processes.
 Uses sessions to maintain state between commands.
 This tool is essential for running CLI tools, installing packages, and managing system operations.
-"""
+"""  # 沙箱Shell工具的描述文本
 
 
 class SandboxShellTool(SandboxToolsBase):
-    """Tool for executing tasks in a Daytona sandbox with browser-use capabilities.
-    Uses sessions for maintaining state between commands and provides comprehensive process management.
+    """沙箱Shell工具类
+
+    用于在Daytona沙箱中执行具有浏览器使用能力的任务。
+    使用会话来维护命令之间的状态，并提供全面的进程管理。
     """
 
-    name: str = "sandbox_shell"
-    description: str = _SHELL_DESCRIPTION
+    name: str = "sandbox_shell"  # 工具名称
+    description: str = _SHELL_DESCRIPTION  # 工具描述
     parameters: dict = {
         "type": "object",
         "properties": {
